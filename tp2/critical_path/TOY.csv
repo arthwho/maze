@@ -3,7 +3,7 @@ CS001,Lógica de Programação,1,1,
 CS002,HTML e CSS,1,1,
 CS003,Algoritmos,2,1,CS001
 CS004,Orientação a Objetos,2,1,
-CS005,Engenharia de Software,3,1,CS004
+CS005,Engenharia de Software,3,1,CS001;CS004
 CS006,Banco de Dados,3,1,CS001
 CS007,Redes de Computadores,4,1,
 CS008,Sistemas Web e Mobile,4,1,CS005

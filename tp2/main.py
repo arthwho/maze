@@ -1,71 +1,240 @@
 import csv
-import networkx as nx
+import heapq
 
-# Função para ler o arquivo CSV e montar o grafo
-def ler_arquivo_csv(nome_arquivo):
-    grafo = nx.DiGraph()  # Grafo direcionado para representar dependências
-    with open(nome_arquivo, mode='r', encoding='utf-8') as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            codigo = row['Codigo'].strip()
-            nome = row['Nome']
-            duracao = int(row['Duracao'])
-            dependencias = row['Dependencias'].split(';') if row['Dependencias'] else []
+class Graph:
+    def __init__(self, vertices):
+        self.V = vertices  # Número de vértices
+        self.graph = {v: [] for v in range(vertices)}  # Grafo representado por uma lista de adjacências
+        self.vertex_map = {}  # Mapeamento de códigos de vértices para seus nomes
 
-            # Adiciona a disciplina como um nó no grafo
-            grafo.add_node(codigo, nome=nome, duracao=duracao)
+    def add_edge(self, u, v, weight):
+        # Adiciona uma aresta do vértice u ao vértice v com o peso especificado
+        self.graph[u].append((v, weight))
 
-            # Adiciona as dependências (arestas) ao grafo
-            for dependencia in dependencias:
-                if dependencia:  # Verifica se existe uma dependência
-                    grafo.add_edge(dependencia, codigo, weight=duracao)
-                    
-    return grafo
+    def add_vertex(self, code, name):
+        # Adiciona um vértice com um código e um nome
+        self.vertex_map[code] = name
 
-# Função para encontrar o caminho crítico (maior caminho de s a t)
-def encontrar_caminho_critico(grafo):
-    # Encontra os nós iniciais (sem predecessores) e finais (sem sucessores)
-    nos_iniciais = [n for n, d in grafo.in_degree() if d == 0]
-    nos_finais = [n for n, d in grafo.out_degree() if d == 0]
+    def dijkstra_max_path(self, src):
+        # Calcula o caminho máximo a partir do vértice src usando uma abordagem semelhante ao algoritmo de Dijkstra
+        dist = [-1e7] * self.V  # Inicializa distâncias como um valor muito baixo
+        dist[src] = 0  # A distância do vértice de origem para ele mesmo é 0
+        priority_queue = [(-0, src)]  # Fila de prioridade (usando valor negativo para maximizar)
 
-    # Adiciona os nós fictícios 's' e 't'
-    grafo.add_node('s')
-    grafo.add_node('t')
+        while priority_queue:
+            current_dist, u = heapq.heappop(priority_queue)
+            current_dist = -current_dist  # Reverte o valor negativo para obter a distância real
 
-    # Liga 's' aos nós iniciais e 't' aos nós finais
-    for n in nos_iniciais:
-        grafo.add_edge('s', n, weight=0)
-    for n in nos_finais:
-        grafo.add_edge(n, 't', weight=grafo.nodes[n]['duracao'])
+            for v, weight in self.graph[u]:
+                # Atualiza a distância se um caminho maior for encontrado
+                if dist[v] < dist[u] + weight:
+                    dist[v] = dist[u] + weight
+                    heapq.heappush(priority_queue, (-dist[v], v))
 
-    # Calcula o caminho mais longo de 's' a 't'
-    caminho_critico = nx.dag_longest_path(grafo, weight='weight')
-    tempo_minimo = nx.dag_longest_path_length(grafo, weight='weight')
+        return dist
 
-    return caminho_critico, tempo_minimo
+    def find_critical_path(self, dist):
+        # Encontra o caminho crítico e o tempo máximo total
+        max_dist = max(dist)  # A maior distância é o tempo total máximo
+        end_vertex = dist.index(max_dist)  # Vértice final do caminho crítico
 
-# Função principal para interação com o usuário
+        # Retroceder para encontrar o caminho crítico
+        path = []
+        current = end_vertex
+        while current != -1:
+            path.append(current)
+            found_predecessor = False
+            for v in range(self.V):
+                for neighbor, weight in self.graph[v]:
+                    if neighbor == current and dist[current] == dist[v] + weight:
+                        current = v
+                        found_predecessor = True
+                        break
+                if found_predecessor:
+                    break
+            if not found_predecessor:
+                break
+
+        path.reverse()  # Inverte o caminho para a ordem correta do início ao fim
+        return path, max_dist
+
+def load_csv(filename):
+    # Carrega o grafo a partir de um arquivo CSV
+    with open(filename, mode='r', encoding='utf-8') as file:
+        csv_reader = csv.DictReader(file)
+        data = list(csv_reader)
+        vertices = len(data)
+        graph = Graph(vertices)
+
+        code_to_index = {}  # Mapeia códigos de vértices para seus índices
+        index = 0
+        for row in data:
+            code = row['Codigo']
+            name = row['Nome']
+            graph.add_vertex(code, name)
+            code_to_index[code] = index
+            index += 1
+
+        for row in data:
+            u = code_to_index[row['Codigo']]
+            duration = int(row['Duracao'])
+            dependencies = row['Dependencias'].split(';')
+
+            for dep in dependencies:
+                if dep:
+                    v = code_to_index[dep]
+                    graph.add_edge(v, u, duration)
+
+        return graph
+
 def main():
     while True:
-        arquivo = input("Informe o arquivo (0 para sair): ")
-        if arquivo == '0':
+        filename = input("Informe o arquivo (0 para sair): ")
+        if filename == "0":
             break
 
-        try:
-            print("\nProcessando ...")
-            grafo = ler_arquivo_csv(arquivo)
-            caminho_critico, tempo_minimo = encontrar_caminho_critico(grafo)
+        print("Processando ...")
 
-            print("\nCaminho Crítico:")
-            for node in caminho_critico:
-                if node not in ['s', 't']:  # Ignora os nós fictícios
-                    print(f"- {grafo.nodes[node]['nome']}")
-            print(f"\nTempo Mínimo: {tempo_minimo}\n")
+        graph = load_csv(filename)
 
-        except FileNotFoundError:
-            print(f"Arquivo {arquivo} não encontrado. Tente novamente.")
-        except Exception as e:
-            print(f"Ocorreu um erro: {e}")
+        # Identifica nós iniciais (sem predecessores)
+        initial_nodes = [i for i in range(graph.V) if not any(i in neighbors for neighbors in graph.graph.values())]
+
+        max_path = []
+        max_time = 0
+
+        for start_node in initial_nodes:
+            dist = graph.dijkstra_max_path(start_node)
+            path, time = graph.find_critical_path(dist)
+            if time > max_time:
+                max_time = time
+                max_path = path
+
+        print("Caminho Crítico:")
+        for vertex in max_path:
+            print(f"- {graph.vertex_map[list(graph.vertex_map.keys())[vertex]]}")
+
+        print(f"Tempo Mínimo: {len(max_path)}")
+
+if __name__ == "__main__":
+    main()
+import csv
+import heapq
+
+class Graph:
+    def __init__(self, vertices):
+        self.V = vertices  # Número de vértices
+        self.graph = {v: [] for v in range(vertices)}  # Grafo representado por uma lista de adjacências
+        self.vertex_map = {}  # Mapeamento de códigos de vértices para seus nomes
+
+    def add_edge(self, u, v, weight):
+        # Adiciona uma aresta do vértice u ao vértice v com o peso especificado
+        self.graph[u].append((v, weight))
+
+    def add_vertex(self, code, name):
+        # Adiciona um vértice com um código e um nome
+        self.vertex_map[code] = name
+
+    def dijkstra_max_path(self, src):
+        # Calcula o caminho máximo a partir do vértice src usando uma abordagem semelhante ao algoritmo de Dijkstra
+        dist = [-1e7] * self.V  # Inicializa distâncias como um valor muito baixo
+        dist[src] = 0  # A distância do vértice de origem para ele mesmo é 0
+        priority_queue = [(-0, src)]  # Fila de prioridade (usando valor negativo para maximizar)
+
+        while priority_queue:
+            current_dist, u = heapq.heappop(priority_queue)
+            current_dist = -current_dist  # Reverte o valor negativo para obter a distância real
+
+            for v, weight in self.graph[u]:
+                # Atualiza a distância se um caminho maior for encontrado
+                if dist[v] < dist[u] + weight:
+                    dist[v] = dist[u] + weight
+                    heapq.heappush(priority_queue, (-dist[v], v))
+
+        return dist
+
+    def find_critical_path(self, dist):
+        # Encontra o caminho crítico e o tempo máximo total
+        max_dist = max(dist)  # A maior distância é o tempo total máximo
+        end_vertex = dist.index(max_dist)  # Vértice final do caminho crítico
+
+        # Retroceder para encontrar o caminho crítico
+        path = []
+        current = end_vertex
+        while current != -1:
+            path.append(current)
+            found_predecessor = False
+            for v in range(self.V):
+                for neighbor, weight in self.graph[v]:
+                    if neighbor == current and dist[current] == dist[v] + weight:
+                        current = v
+                        found_predecessor = True
+                        break
+                if found_predecessor:
+                    break
+            if not found_predecessor:
+                break
+
+        path.reverse()  # Inverte o caminho para a ordem correta do início ao fim
+        return path, max_dist
+
+def load_csv(filename):
+    # Carrega o grafo a partir de um arquivo CSV
+    with open(filename, mode='r', encoding='utf-8') as file:
+        csv_reader = csv.DictReader(file)
+        data = list(csv_reader)
+        vertices = len(data)
+        graph = Graph(vertices)
+
+        code_to_index = {}  # Mapeia códigos de vértices para seus índices
+        index = 0
+        for row in data:
+            code = row['Codigo']
+            name = row['Nome']
+            graph.add_vertex(code, name)
+            code_to_index[code] = index
+            index += 1
+
+        for row in data:
+            u = code_to_index[row['Codigo']]
+            duration = int(row['Duracao'])
+            dependencies = row['Dependencias'].split(';')
+
+            for dep in dependencies:
+                if dep:
+                    v = code_to_index[dep]
+                    graph.add_edge(v, u, duration)
+
+        return graph
+
+def main():
+    while True:
+        filename = input("Informe o arquivo (0 para sair): ")
+        if filename == "0":
+            break
+
+        print("Processando ...")
+
+        graph = load_csv(filename)
+
+        # Identifica nós iniciais (sem predecessores)
+        initial_nodes = [i for i in range(graph.V) if not any(i in neighbors for neighbors in graph.graph.values())]
+
+        max_path = []
+        max_time = 0
+
+        for start_node in initial_nodes:
+            dist = graph.dijkstra_max_path(start_node)
+            path, time = graph.find_critical_path(dist)
+            if time > max_time:
+                max_time = time
+                max_path = path
+
+        print("Caminho Crítico:")
+        for vertex in max_path:
+            print(f"- {graph.vertex_map[list(graph.vertex_map.keys())[vertex]]}")
+
+        print(f"Tempo Mínimo: {len(max_path)}")
 
 if __name__ == "__main__":
     main()
