@@ -137,7 +137,7 @@ def main():
         for vertex in max_path:
             print(f"- {graph.vertex_map[list(graph.vertex_map.keys())[vertex]]}")
 
-        print(f"Tempo Mínimo: {max_time}")
+        print(f"Tempo Mínimo: {len(max_path)}")
 
         # Desenha o grafo com o caminho crítico destacado
         graph.draw_graph(max_path)
