@@ -65,9 +65,10 @@ class Graph:
         G = nx.DiGraph()
 
         for u in range(self.V):
+            G.add_node(self.vertex_map[list(self.vertex_map.keys())[u]])  # Adiciona o nó independentemente de arestas
             for v, weight in self.graph[u]:
                 G.add_edge(self.vertex_map[list(self.vertex_map.keys())[u]], self.vertex_map[list(self.vertex_map.keys())[v]], weight=weight)
-
+                
         pos = nx.spring_layout(G)
         labels = nx.get_edge_attributes(G, 'weight')
 
@@ -138,6 +139,9 @@ def main():
             print(f"- {graph.vertex_map[list(graph.vertex_map.keys())[vertex]]}")
 
         print(f"Tempo Mínimo: {len(max_path)}")
+        print("Vértices:", graph.vertex_map)
+        print("Arestas:", graph.graph)
+
 
         # Desenha o grafo com o caminho crítico destacado
         graph.draw_graph(max_path)
