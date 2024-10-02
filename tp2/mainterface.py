@@ -18,46 +18,62 @@ class Graph:
         self.vertex_map[code] = name
 
     def dijkstra_max_path(self, src):
-        # Calcula o caminho máximo a partir do vértice src usando uma abordagem semelhante ao algoritmo de Dijkstra
-        dist = [-1e7] * self.V  # Inicializa distâncias como um valor muito baixo
-        dist[src] = 0  # A distância do vértice de origem para ele mesmo é 0
-        priority_queue = [(-0, src)]  # Fila de prioridade (usando valor negativo para maximizar)
+        # Calcula o caminho máximo a partir do vértice src utilizando uma variação do algoritmo de Dijkstra,
+        # adaptada para encontrar o caminho de maior peso em vez do menor.
+
+        dist = [-1e7] * self.V  # Inicializa todas as distâncias com um valor muito baixo (representando "infinito negativo").
+        dist[src] = 0  # Define a distância do vértice de origem (src) para ele mesmo como 0.
+        priority_queue = [(-0, src)]  # Fila de prioridade (min-heap) inicializada com a origem, usando distâncias negativas para maximizar.
 
         while priority_queue:
-            current_dist, u = heapq.heappop(priority_queue)
-            current_dist = -current_dist  # Reverte o valor negativo para obter a distância real
+            current_dist, u = heapq.heappop(priority_queue)  # Remove o vértice com a maior distância (negativa) da fila de prioridade.
+            current_dist = -current_dist  # Reverte o valor para obter a distância positiva correta.
 
+            # Itera sobre todos os vizinhos do vértice u.
             for v, weight in self.graph[u]:
-                # Atualiza a distância se um caminho maior for encontrado
+                # Se a distância até o vizinho v pelo vértice u for maior que a distância atual de v, atualiza-a.
                 if dist[v] < dist[u] + weight:
-                    dist[v] = dist[u] + weight
-                    heapq.heappush(priority_queue, (-dist[v], v))
+                    dist[v] = dist[u] + weight  # Atualiza a distância de v com o novo caminho mais longo.
+                    heapq.heappush(priority_queue, (-dist[v], v))  # Adiciona o vizinho v à fila com a nova distância negativa.
 
-        return dist
+        return dist  # Retorna a lista de distâncias máximas de src para todos os vértices.
+
 
     def find_critical_path(self, dist):
-        # Encontra o caminho crítico e o tempo máximo total
-        max_dist = max(dist)  # A maior distância é o tempo total máximo
-        end_vertex = dist.index(max_dist)  # Vértice final do caminho crítico
+        # Encontra o caminho crítico (caminho com maior duração total)
+        # e o tempo máximo total de execução.
 
-        # Retroceder para encontrar o caminho crítico
-        path = []
-        current = end_vertex
+        # O caminho crítico começa do vértice com a maior distância acumulada.
+        max_dist = max(dist)  # A maior distância é o tempo total máximo do caminho crítico.
+        end_vertex = dist.index(max_dist)  # O vértice final do caminho crítico é aquele que atinge essa maior distância.
+
+        # Inicia o processo de retroceder a partir do vértice final para encontrar o caminho completo.
+        path = []  # Lista para armazenar os vértices que compõem o caminho crítico.
+        current = end_vertex  # Começa do vértice final.
+        
+        # Retrocede pelos predecessores para reconstruir o caminho crítico.
         while current != -1:
-            path.append(current)
-            found_predecessor = False
+            path.append(current)  # Adiciona o vértice atual ao caminho.
+            found_predecessor = False  # Flag para verificar se encontramos o predecessor do vértice atual.
+            
+            # Itera sobre todos os vértices para encontrar o predecessor do vértice atual no caminho crítico.
             for v in range(self.V):
                 for neighbor, weight in self.graph[v]:
+                    # Verifica se a distância do vértice atual é igual à distância do predecessor mais o peso da aresta.
                     if neighbor == current and dist[current] == dist[v] + weight:
-                        current = v
-                        found_predecessor = True
+                        current = v  # Atualiza o vértice atual para o predecessor.
+                        found_predecessor = True  # Marca que o predecessor foi encontrado.
                         break
-                if found_predecessor:
+                if found_predecessor:  # Sai do loop se o predecessor foi encontrado.
                     break
-            if not found_predecessor:
+            
+            if not found_predecessor:  # Se não houver mais predecessores, termina a reconstrução do caminho.
                 break
 
-        path.reverse()  # Inverte o caminho para a ordem correta do início ao fim
+        # O caminho foi construído do final para o início, então precisamos invertê-lo.
+        path.reverse()  # Inverte a ordem para que o caminho comece no vértice inicial.
+        
+        # Retorna o caminho crítico e o tempo máximo (duração total do caminho).
         return path, max_dist
 
     def draw_graph(self, path):
